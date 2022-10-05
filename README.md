@@ -5,6 +5,8 @@ Install with your favorite plugin manager, then enable it in your configuration 
 
 See `:h foldhue` for basic notes on customization.
 
+This plugin adds color text from the treesitter highlights on top of the standard `foldtext`.
+
 Before:
 
 ![colorless](https://user-images.githubusercontent.com/734359/194146391-440279c2-5580-4614-aa59-2f3c482ded83.png)
