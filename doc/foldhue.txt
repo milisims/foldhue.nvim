@@ -1,0 +1,97 @@
+*foldhue.txt*	Last change: 2022 Oct 05
+
+Author:  Emilia Simmons
+License: MIT
+
+===============================================================================
+OVERVIEW                                               *foldhue-overview*
+
+Foldhue simply extracts tree-sitter highlights and plops them overtop the
+foldtext using |nvim_buf_set_extmark| at column 0. Nvim will draw the extmark
+overtop (with virt_text_pos = "overlay") the fold text, which makes it look
+like the fold has been colorized.
+
+Use `require('foldhue').enable()` in your init.lua to enable the plugin.
+
+===============================================================================
+CUSTOMIZATION                                          *foldhue-fade*
+
+You can customize how the fading works by changing the `fade` function: >
+  require('foldhue').fade = function(hl)
+  function foldhue.fade(hl)
+    local rgb = string.format('%0X', hl.foreground)  -- octal to hex
+    local r, g, b = rgb:sub(1, 2), rgb:sub(3, 4), rgb:sub(5, 6)
+    local f = (1 - 0.33)
+    -- hex to number, so we can do math:
+    r, g, b = vim.fn.str2nr(r, 16) * f, vim.fn.str2nr(g, 16) * f, vim.fn.str2nr(b, 16) * f
+    -- back to hex:
+    hl.foreground = vim.fn.printf('#%x%x%x', math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5))
+    return hl
+  end
+<
+Foldhue passes into this function `hl`, the output of |nvim_get_hl_by_name|,
+and expects a return value accepted by |nvim_set_hl|. The default function
+above reduces foreground rgb by a third.
+
+
+ADDING LANGUAGES                                       *foldhue-langs*
+
+To add a custom language fold text, simply add it to the `foldhue.langs`
+table: >
+  local langs = require('foldhue').langs
+  function langs.lua(buf, lnum)
+    local groups = from_captures(buf, lnum)
+    groups[#groups+1] = { ' ... ', 'Folded' }
+    local node = vim.treesitter.get_node_at_pos(buf, lnum, 0)
+    vim.list_extend(groups, from_captures(buf, node:end_(), {}))
+    return groups
+  end
+<
+
+These functions must accept {buf} and {lnum} as arguments. This function
+changes the foldtext of the function above from
+`function langs.lua(buf, lnum)`
+to
+`function langs.lua(buf, lnum) ... end`
+With appropriate colorization.
+
+Any functions added to this table must return a table accepted by the
+`virt_text` opt of |nvim_buf_set_extmark|
+
+  virt_text : virtual text to link to this mark. A list of [text, highlight]
+  tuples, each representing a text chunk with specified highlight. `highlight`
+  element can either be a single highlight group, or an array of multiple
+  highlight groups that will be stacked (highest priority last). A highlight
+  group can be supplied either as a string or as an integer, the latter which
+  can be obtained using |nvim_get_hl_id_by_name()|.
+
+===============================================================================
+FUNCTIONS                                                   *foldhue-functions*
+
+foldhue.from_captures({buf}, {lnum}[, {opts}])          *foldhue.from_captures*
+    Extracts the highlights from treesitter highlighting in {buf} at {lnum}.
+    The returned table is set up to use directly with |nvim_buf_set_extmark|.
+    {opts} is a table that may contain a column `range`, and an option to
+    `skip_fade`. These are useful for calling from a custom language
+    colorizer.
+    Any text that seems to be lacking a highlight group will be given the
+    `Folded` highlight group.
+
+    Note that the returned value uses the highest priority highlight group and
+    drops the rest. For example, in lua function parameters are highlighted as
+    { variable, parameter }, so if your `@parameter` highlight group is
+    undefined, then your unfolded highlighting properly uses `variable`, but
+    the folded highlighting will not. This can easily be remedied by adding a
+    call to |nvim_set_hl| like:
+      `nvim_set_hl(0, "@parameter", { link = "@variable" })`
+    Use |get_captures_at_cursor| to investigate discrepancies.
+
+foldhue.clear_fade_cache()                           *foldhue.clear_fade_cache*
+    Foldhue caches the results of foldhue.fade results, so if you are
+    modifying the function and observing the results interactively, it might
+    h elp to add this function temporarily into your script.
+
+As expected:
+    foldhue.enable()                                           *foldhue.enable*
+    foldhue.disable()                                         *foldhue.disable*
+    foldhue.toggle()                                           *foldhue.toggle*
